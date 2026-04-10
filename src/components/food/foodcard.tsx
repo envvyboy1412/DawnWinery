@@ -70,7 +70,7 @@ export function FoodCard(props: FoodCardProps) {
   const isAdmin = role === "admin";
 
   const goToDetail = () => {
-    router.push(`/user/food/${id}`);
+    router.push(`/user/foodlist/food/${id}`);
   };
 
   return (
