@@ -5,6 +5,7 @@ import { useAuthGuard } from "@/hooks/useAuthGuard";
 import { Toaster, toast } from "sonner";
 import { getMyProfile, updateProfile } from "@/service/user.service";
 import { uploadImage } from "@/service/images.service";
+import imageCompression from "browser-image-compression";
 
 export default function ProfilePage() {
   useAuthGuard();
@@ -12,13 +13,13 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [user, setUser] = useState<any>(null);
-  // modal
+
   const [openModal, setOpenModal] = useState(false);
-  // form
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
-  // image
+
   const [profilePicture, setProfilePicture] = useState<File | null>(null);
   const [previewImage, setPreviewImage] = useState("");
 
@@ -50,46 +51,57 @@ export default function ProfilePage() {
     setOpenModal(true);
   };
 
-  const handleFileChange = (file: File) => {
-    if (!file.type.startsWith("image/")) {
-      alert("File harus berupa gambar");
-      return;
+
+const handleFileChange = async (file: File) => {
+  if (!file.type.startsWith("image/")) {
+    toast.error("File harus berupa gambar");
+    return;
+  }
+
+  let finalFile = file;
+
+  if (file.size > 1 * 1024 * 1024) {
+    finalFile = await imageCompression(file, {
+      maxSizeMB: 1,
+      maxWidthOrHeight: 1024,
+      useWebWorker: true,
+    });
+  }
+
+  setProfilePicture(finalFile);
+  setPreviewImage(URL.createObjectURL(finalFile));
+};
+
+const handleSubmit = async () => {
+  try {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    let profilePictureUrl: string | undefined;
+
+    if (profilePicture) {
+      profilePictureUrl = await uploadImage(profilePicture);
     }
-    if (file.size > 2 * 1024 * 1024) {
-      alert("Ukuran maksimal 2MB");
-      return;
-    }
-    setProfilePicture(file);
-    setPreviewImage(URL.createObjectURL(file));
-  };
 
-  const handleSubmit = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      if (!token) return;
+    await updateProfile({
+      token,
+      name,
+      email,
+      phoneNumber,
+      profilePictureUrl,
+    });
 
-      let profilePictureUrl: string | undefined;
+    toast.success("Profil berhasil diperbarui 🎉");
+    window.dispatchEvent(new Event("user-updated"));
+    setOpenModal(false);
+    fetchProfile();
+  } catch (err: any) {
+    console.log(err);
 
-      if (profilePicture) {
-        profilePictureUrl = await uploadImage(profilePicture);
-      }
 
-      await updateProfile({
-        token,
-        name,
-        email,
-        phoneNumber,
-        profilePictureUrl,
-      });
-
-      toast.success("Profil berhasil diperbarui 🎉", { duration: 3000 });
-      window.dispatchEvent(new Event("user-updated"));
-      setOpenModal(false);
-      fetchProfile();
-    } catch (err: any) {
-      toast.error(err.message || "Gagal memperbarui profil");
-    }
-  };
+    toast.error(err.message || "Gagal memperbarui profil");
+  }
+};
 
   return (
     <div className="min-h-screen flex flex-col bg-[#3E3F29]">
@@ -106,7 +118,7 @@ export default function ProfilePage() {
                 MY ACCOUNT
               </h1>
 
-              <div className="flex flex-col items-center text-center p-4  space-y-3">
+              <div className="flex flex-col items-center text-center p-4 space-y-3">
                 <img
                   src={user.profilePictureUrl || "/avatar-placeholder.png"}
                   className="w-32 h-32 rounded-full object-cover"
@@ -121,15 +133,7 @@ export default function ProfilePage() {
 
                 <button
                   onClick={handleOpenModal}
-                  style={{
-                    fontSize: "17px",
-                    padding: "0.5em 2em",
-                    boxShadow: "2px 2px 4px rgba(0,0,0,0.4)",
-                    background: "#BCA88D",
-                    color: "white",
-                    borderRadius: "4px",
-                  }}
-                  className="mt-4 active:translate-y-1 hover:bg-linear-to-r hover:from-blue-500 hover:to-cyan-400"
+                  className="mt-4 px-4 py-2 bg-[#BCA88D] text-white rounded"
                 >
                   Update Profile
                 </button>
@@ -138,6 +142,7 @@ export default function ProfilePage() {
           )}
         </section>
       </main>
+
       <Footer />
 
       <Toaster position="top-center" richColors />
@@ -150,82 +155,64 @@ export default function ProfilePage() {
             </h2>
 
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm mb-1 text-[#F1F0E4]">
-                  Name
-                </label>
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full  rounded px-3 py-2 bg-[#7D8D86]"
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full rounded px-3 py-2 bg-[#7D8D86]"
+                placeholder="Name"
+              />
+
+              <input
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full rounded px-3 py-2 bg-[#7D8D86]"
+                placeholder="Email"
+              />
+
+              <div className="flex flex-col items-center gap-3">
+                <img
+                  src={previewImage || "/avatar-placeholder.png"}
+                  className="w-40 h-40 object-cover rounded-md"
                 />
-              </div>
 
-              <div>
-                <label className="block text-sm mb-1 text-[#F1F0E4]">
-                  Email
-                </label>
                 <input
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full  rounded px-3 py-2 bg-[#7D8D86] shadow-2xl"
+                  id="profilePicture"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files?.[0]) {
+                      handleFileChange(e.target.files[0]);
+                    }
+                  }}
                 />
-              </div>
 
-              <div>
-                <label className="block text-sm mb-2 text-[#F1F0E4]">
-                  Profile Picture
+                <label
+                  htmlFor="profilePicture"
+                  className="cursor-pointer px-4 py-2 rounded bg-[#7D8D86] text-white text-sm"
+                >
+                  Pilih Foto
                 </label>
-
-                <div className="flex flex-col items-center gap-3">
-                  <img
-                    src={previewImage || "/avatar-placeholder.png"}
-                    className="w-40 h-40 object-cover rounded-md "
-                  />
-
-                  <input
-                    id="profilePicture"
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files?.[0]) {
-                        handleFileChange(e.target.files[0]);
-                      }
-                    }}
-                  />
-
-                  <label
-                    htmlFor="profilePicture"
-                    className="cursor-pointer px-4 py-2 rounded bg-[#7D8D86] text-white text-sm"
-                  >
-                    Pilih Foto
-                  </label>
-                </div>
               </div>
 
-              <div>
-                <label className="block text-sm mb-1 text-[#F1F0E4]">
-                  Phone Number
-                </label>
-                <input
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  className="w-full  rounded px-3 py-2 bg-[#7D8D86]"
-                />
-              </div>
+              <input
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                className="w-full rounded px-3 py-2 bg-[#7D8D86]"
+                placeholder="Phone Number"
+              />
             </div>
 
             <div className="mt-6 flex justify-end gap-3">
               <button
                 onClick={() => setOpenModal(false)}
-                className="cursor-pointer transition-all bg-red-700 text-white text-sm font-medium px-5 py-1.5 rounded-lg border-red-500 border-b-4 hover:brightness-110 hover:-translate-y-px hover:border-b-[6px] active:border-b-2 active:brightness-90 active:translate-y-0.5"
+                className="bg-red-600 text-white px-4 py-2 rounded"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmit}
-                className="cursor-pointer transition-all bg-green-700 text-white text-sm font-medium px-5 py-1.5 rounded-lg border-green-500 border-b-4 hover:brightness-110 hover:-translate-y-px hover:border-b-[6px] active:border-b-2 active:brightness-90 active:translate-y-0.5"
+                className="bg-green-600 text-white px-4 py-2 rounded"
               >
                 Save
               </button>
