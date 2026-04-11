@@ -146,7 +146,7 @@ export function Navbar() {
               )}
 
               <Link
-                href="/user/edit-profile"
+                href="/user/profile"
                 className="block px-4 py-2 hover:bg-gray-100"
               >
                 Edit Profile
@@ -191,7 +191,7 @@ export function Navbar() {
 
             {isAdmin && <Link href="/admin">Dashboard</Link>}
             {!isAdmin && <Link href="/user/history">History</Link>}
-            <Link href="/user/edit-profile">Edit Profile</Link>
+            <Link href="/user/profile">Edit Profile</Link>
 
             <button onClick={handleLogout} className="text-left text-red-200">
               Logout
