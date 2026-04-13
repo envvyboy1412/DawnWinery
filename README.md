@@ -14,7 +14,7 @@ Aplikasi juga menerapkan **protected route**, **data fetching dari API**, serta 
 
 # 🚀 Live Demo
 
-https://final-project-pedroni-gilbran-fe-25.vercel.app/
+https://dawn-winery-project.vercel.app/
 
 ---
 
